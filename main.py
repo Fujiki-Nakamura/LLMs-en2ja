@@ -530,66 +530,66 @@ def main(model_args, data_args, training_args):
     p_eval_step = jax.pmap(eval_step, "batch", donate_argnums=(0, ))
 
     state = jax_utils.replicate(state)
+    if training_args.do_train:
+        train_time = 0
+        epochs = tqdm(range(num_epochs), desc="Epoch ... ", position=0)
+        for epoch in epochs:
+            train_start = time.time()
+            train_metrics = []
 
-    train_time = 0
-    epochs = tqdm(range(num_epochs), desc="Epoch ... ", position=0)
-    for epoch in epochs:
-        train_start = time.time()
-        train_metrics = []
+            rng, input_rng = jax.random.split(rng)
+            num_train_samples = len(tokenized_datasets["train"])
+            train_samples_idx = np.random.permutation(np.arange(num_train_samples))
+            train_batch_idx = generate_batch_splits(train_samples_idx, train_batch_size)
 
-        rng, input_rng = jax.random.split(rng)
-        num_train_samples = len(tokenized_datasets["train"])
-        train_samples_idx = np.random.permutation(np.arange(num_train_samples))
-        train_batch_idx = generate_batch_splits(train_samples_idx, train_batch_size)
+            for step, batch_idx in enumerate(tqdm(train_batch_idx, desc="Training...", position=1)):
+                samples = [tokenized_datasets["train"][int(idx)] for idx in batch_idx]
+                model_inputs = data_collator(samples)
 
-        for step, batch_idx in enumerate(tqdm(train_batch_idx, desc="Training...", position=1)):
-            samples = [tokenized_datasets["train"][int(idx)] for idx in batch_idx]
-            model_inputs = data_collator(samples)
+                local_host_model_inputs = {
+                    key: np.split(model_inputs.data[key], num_of_hosts, axis=0)[current_host_idx]
+                    for key, value in model_inputs.data.items()
+                }
+                # forward
+                model_inputs = shard(local_host_model_inputs)
+                state, train_metric, dropout_rngs = p_train_step(state, model_inputs, dropout_rngs)
+                train_metrics.append(train_metric)
 
-            local_host_model_inputs = {
-                key: np.split(model_inputs.data[key], num_of_hosts, axis=0)[current_host_idx]
-                for key, value in model_inputs.data.items()
-            }
-            # forward
-            model_inputs = shard(local_host_model_inputs)
-            state, train_metric, dropout_rngs = p_train_step(state, model_inputs, dropout_rngs)
-            train_metrics.append(train_metric)
+                cur_step = epoch * (num_train_samples // train_batch_size) + step
+                if cur_step % training_args.logging_steps == 0 and cur_step > 0:
+                    train_metric = jax_utils.unreplicate(train_metric)
+                    train_time += time.time() - train_start
+                    if has_tensorboard and jax.process_index() == 0:
+                        write_train_metric(summary_writer, train_metrics, train_time, cur_step)
+                    epochs.write(f"Step... ({cur_step} | Loss: {train_metric['loss'].mean()}, Learning Rate: {train_metric['learning_rate'].mean()})")  # noqa
+                    train_metrics = []
 
-            cur_step = epoch * (num_train_samples // train_batch_size) + step
-            if cur_step % training_args.logging_steps == 0 and cur_step > 0:
-                train_metric = jax_utils.unreplicate(train_metric)
-                train_time += time.time() - train_start
-                if has_tensorboard and jax.process_index() == 0:
-                    write_train_metric(summary_writer, train_metrics, train_time, cur_step)
-                epochs.write(f"Step... ({cur_step} | Loss: {train_metric['loss'].mean()}, Learning Rate: {train_metric['learning_rate'].mean()})")  # noqa
-                train_metrics = []
+                if cur_step % training_args.eval_steps == 0 and cur_step > 0:
+                    num_eval_samples = len(tokenized_datasets["validation"])
+                    eval_samples_idx = jnp.arange(num_eval_samples)
+                    eval_batch_idx = generate_batch_splits(eval_samples_idx, eval_batch_size)
 
-            if cur_step % training_args.eval_steps == 0 and cur_step > 0:
-                num_eval_samples = len(tokenized_datasets["validation"])
-                eval_samples_idx = jnp.arange(num_eval_samples)
-                eval_batch_idx = generate_batch_splits(eval_samples_idx, eval_batch_size)
+                    eval_metrics = []
+                    for i, batch_idx in enumerate(tqdm(eval_batch_idx, desc="Evaluating...", position=2)):
+                        samples = [tokenized_datasets["validation"][int(idx)] for idx in batch_idx]
+                        model_inputs = data_collator(samples)
+                        # forward
+                        model_inputs = shard(model_inputs.data)
+                        metrics = p_eval_step(state.params, model_inputs)
+                        eval_metrics.append(metrics)
+                    eval_metrics = get_metrics(eval_metrics)
+                    eval_metrics = jax.tree_map(jnp.mean, eval_metrics)
+                    epochs.write(f"Step... ({cur_step} | Loss: {eval_metrics['loss']}, Acc: {eval_metrics['accuracy']})")
+                    if has_tensorboard and jax.process_index() == 0:
+                        write_eval_metric(summary_writer, eval_metrics, cur_step)
 
-                eval_metrics = []
-                for i, batch_idx in enumerate(tqdm(eval_batch_idx, desc="Evaluating...", position=2)):
-                    samples = [tokenized_datasets["validation"][int(idx)] for idx in batch_idx]
-                    model_inputs = data_collator(samples)
-                    # forward
-                    model_inputs = shard(model_inputs.data)
-                    metrics = p_eval_step(state.params, model_inputs)
-                    eval_metrics.append(metrics)
-                eval_metrics = get_metrics(eval_metrics)
-                eval_metrics = jax.tree_map(jnp.mean, eval_metrics)
-                epochs.write(f"Step... ({cur_step} | Loss: {eval_metrics['loss']}, Acc: {eval_metrics['accuracy']})")
-                if has_tensorboard and jax.process_index() == 0:
-                    write_eval_metric(summary_writer, eval_metrics, cur_step)
-
-            if cur_step % training_args.save_steps == 0 and cur_step > 0:
-                if jax.process_index() == 0:
-                    params = jax.device_get(jax.tree_map(lambda x: x[0], state.params))
-                    model.save_pretrained(training_args.output_dir, params=params)
-                    tokenizer.save_pretrained(training_args.output_dir)
-                    if training_args.push_to_hub:
-                        repo.push_to_hub(commit_message=f"Saving weights and logs of step {cur_step}", blocking=False)
+                if cur_step % training_args.save_steps == 0 and cur_step > 0:
+                    if jax.process_index() == 0:
+                        params = jax.device_get(jax.tree_map(lambda x: x[0], state.params))
+                        model.save_pretrained(training_args.output_dir, params=params)
+                        tokenizer.save_pretrained(training_args.output_dir)
+                        if training_args.push_to_hub:
+                            repo.push_to_hub(commit_message=f"Saving weights and logs of step {cur_step}", blocking=False)
 
     if training_args.do_eval:
         num_eval_samples = len(tokenized_datasets["validation"])
