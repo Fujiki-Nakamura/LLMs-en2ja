@@ -638,12 +638,15 @@ def main(model_args, data_args, training_args):
 if __name__ == "__main__":
     import argparse
     import importlib
+    from utils import Timer
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="cfg_0")
-    args, _ = parser.parse_known_args()
-    config = importlib.import_module(args.config)
-    model_args = config.ModelArguments()
-    data_args = config.DataArguments()
-    training_args = config.TrainingArguments()
-    main(model_args, data_args, training_args)
+    with Timer(prefix="setup"):
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--config", type=str, default="cfg_0")
+        args, _ = parser.parse_known_args()
+        config = importlib.import_module(args.config)
+        model_args = config.ModelArguments()
+        data_args = config.DataArguments()
+        training_args = config.TrainingArguments()
+    with Timer(prefix="main"):
+        main(model_args, data_args, training_args)
