@@ -384,6 +384,7 @@ def main(model_args, data_args, training_args):
         num_proc=data_args.preprocessing_num_workers,
         remove_columns=column_names,
         load_from_cache_file=not data_args.overwrite_cache,
+        desc="Tokenizing...",
     )
 
     expanded_inputs_length, targets_length = compute_input_and_target_lengths(
@@ -408,6 +409,7 @@ def main(model_args, data_args, training_args):
         batched=True,
         num_proc=data_args.preprocessing_num_workers,
         load_from_cache_file=not data_args.overwrite_cache,
+        desc="Grouping texts...",
     )
 
     has_tensorboard = is_tensorboard_available()
