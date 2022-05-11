@@ -22,8 +22,7 @@ from flax.training import train_state
 from flax.training.common_utils import get_metrics, onehot, shard
 from huggingface_hub import Repository
 from transformers import (
-    # CONFIG_MAPPING,
-    FLAX_MODEL_FOR_MASKED_LM_MAPPING,
+    CONFIG_MAPPING, FLAX_MODEL_FOR_MASKED_LM_MAPPING,
     AutoTokenizer, BatchEncoding, FlaxT5ForConditionalGeneration,
     # HfArgumentParser,
     PreTrainedTokenizerBase, T5Config,
@@ -340,14 +339,33 @@ def main(model_args, data_args, training_args):
             use_fast=model_args.use_fast_tokenizer,
             use_auto_token=model_args.use_auth_token,
         )
+    elif model_args.model_name_or_path:
+        tokenizer = AutoTokenizer.from_pretrained(
+            model_args.model_name_or_path,
+            cache_dir=model_args.cache_dir,
+            use_fast=model_args.use_fast_tokenizer,
+            use_auth_token=True if model_args.use_auth_token else None,
+        )
+    else:
+        raise ValueError(
+            "You are instantiating a new tokenizer from scratch. This is not supported by this script."
+            "You can do it from another script, save it, and load it from here, using --tokenizer_name."
+        )
 
     if model_args.config_name:
         config = T5Config.from_pretrained(
             model_args.config_name,
             cache_dir=model_args.cache_dir,
             vocab_size=len(tokenizer),
-            use_auth_token=model_args.use_auth_token,
-        )
+            use_auth_token=model_args.use_auth_token,)
+    elif model_args.model_name_or_path:
+        config = T5Config.from_pretrained(
+            model_args.model_name_or_path,
+            cache_dir=model_args.cache_dir,
+            use_auth_token=model_args.use_auth_token,)
+    else:
+        config = CONFIG_MAPPING[model_args.model_type]()
+        logger.warning("You are instantiating a new config instance from scratch.")
 
     if training_args.do_train:
         column_names = datasets["train"].column_names
