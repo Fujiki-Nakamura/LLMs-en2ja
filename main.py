@@ -4,12 +4,10 @@ import json
 import logging
 import os
 import time
-from dataclasses import asdict, dataclass, field
 
-from enum import Enum
 from itertools import chain
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import numpy as np
 from datasets import load_dataset, DatasetDict
@@ -37,90 +35,6 @@ from transformers.utils import get_full_repo_name
 
 MODEL_CONFIG_CLASSES = list(FLAX_MODEL_FOR_MASKED_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
-
-print(jax.devices())
-
-
-@dataclass
-class ModelArguments:
-    model_name_or_path: Optional[str] = field(default="fnakamura/t5-base-en2ja")
-    model_type: Optional[str] = field(default="t5")
-    config_name: Optional[str] = field(default="fnakamura/t5-base-en2ja")
-    tokenizer_name: Optional[str] = field(default="fnakamura/t5-base-en2ja")
-    cache_dir: Optional[str] = field(default=os.getenv("HF_DATASETS_CACHE"))
-    use_fast_tokenizer: bool = field(default=True)
-    dtype: Optional[str] = field(default="float32")
-    use_auth_token: bool = field(default=False)
-
-
-@dataclass
-class DataArguments:
-    dataset_name: Optional[str] = field(default=None)
-    dataset_config_name: Optional[str] = field(default=None)
-    # dataset_name: Optional[str] = field(default="oscar")
-    # dataset_config_name: Optional[str] = field(default="unshuffled_deduplicated_ja")
-    data_files: Optional[str] = field(default="/workspace/data/fnakamura/workspace/lm/ja_wikipedia/AA/*.jsonl")
-    train_file: Optional[str] = field(default=None)
-    validation_file: Optional[str] = field(default=None)
-    train_ref_file: Optional[str] = field(default=None)
-    validation_ref_file: Optional[str] = field(default=None)
-    overwrite_cache: bool = field(default=False)
-    validation_split_percentage: Optional[int] = field(default=5)
-    max_seq_length: Optional[int] = field(default=512)
-    preprocessing_num_workers: Optional[int] = field(default=None)
-    mlm_probability: float = field(default=0.15)
-    mean_noise_span_length: float = field(default=3.0)
-
-    def __post_init__(self):
-        if self.dataset_name is None and self.train_file is None and self.validation_file is None and self.data_files is None:  # noqa
-            raise ValueError("Need either a dataset name or a training/validation file.")
-        else:
-            if self.train_file is not None:
-                extension = self.train_file.split(".")[-1]
-                assert extension in ["csv", "json", "txt"], "`train_file` should be a csv, a json or a txt file."
-            if self.validation_file is not None:
-                extension = self.validation_file.split(".")[-1]
-                assert extension in ["csv", "json", "txt"], "`validation_file` should be a csv, a json or a txt file."
-
-
-@dataclass
-class TrainingArguments:
-    output_dir: str = field(default="/workspace/data/fnakamura/workspace/t2t/outputs/t5-base-en2ja_0")
-    overwrite_output_dir: bool = field(default=False)
-
-    do_train: bool = field(default=True)
-    do_eval: bool = field(default=False)
-
-    per_device_train_batch_size: int = field(default=16)
-    per_device_eval_batch_size: int = field(default=16)
-    learning_rate: float = field(default=5e-5)
-    weight_decay: float = field(default=0.0)
-    adam_beta1: float = field(default=0.9)
-    adam_beta2: float = field(default=0.999)
-    adam_epsilon: float = field(default=1e-8)
-    adafactor: bool = field(default=False)
-    num_train_epochs: float = field(default=3.0)
-    warmup_steps: int = field(default=0)
-    logging_steps: int = field(default=100)
-    save_steps: int = field(default=100)
-    eval_steps: int = field(default=100)
-    # push_to_hub: bool = field(default=False)
-    push_to_hub: bool = field(default=True)
-    hub_model_id: str = field(default=None)
-    hub_token: str = field(default=os.getenv("HF_TOKEN"))
-    seed: int = field(default=42)
-
-    def __post_init__(self):
-        if self.output_dir is not None:
-            self.output_dir = os.path.expanduser(self.output_dir)
-
-    def to_dict(self):
-        d = asdict(self)
-        for k, v in d.items():
-            if isinstance(v, Enum): d[k] = v.value  # noqa
-            if isinstance(v, list) and len(v) > 0 and isinstance(v[0], Enum): d[k] = [x.value for x in v]  # noqa
-            if k.endswith("_token"): d[k] = f"<{k.uppser()}>"  # noqa
-        return d
 
 
 def compute_input_and_target_lengths(inputs_length, noise_density, mean_noise_span_length):
@@ -356,13 +270,7 @@ def write_eval_metric(summary_writer, eval_metrics, step):
         summary_writer.scalar(f"eval_{metric_name}", value, step)
 
 
-def main():
-    # parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
-    # model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-    model_args = ModelArguments()
-    data_args = DataArguments()
-    training_args = TrainingArguments()
-
+def main(model_args, data_args, training_args):
     if (
         os.path.exists(training_args.output_dir)
         and os.listdir(training_args.output_dir)
@@ -690,4 +598,14 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    import importlib
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="cfg_0")
+    args, _ = parser.parse_known_args()
+    config = importlib.import_module(args.config)
+    model_args = config.ModelArguments()
+    data_args = config.DataArguments()
+    training_args = config.TrainingArguments()
+    main(model_args, data_args, training_args)
