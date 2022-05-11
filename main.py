@@ -386,6 +386,11 @@ def main(model_args, data_args, training_args):
         load_from_cache_file=not data_args.overwrite_cache,
         desc="Tokenizing...",
     )
+    _path = os.path.join(training_args.output_dir, "tokenized")
+    if not os.path.exists(_path):
+        os.makedirs(_path)
+    tokenized_datasets.save_to_disk(_path)
+    logger.info(f"Tokenized datasets saved at {_path}")
 
     expanded_inputs_length, targets_length = compute_input_and_target_lengths(
         inputs_length=max_seq_length,
@@ -411,6 +416,11 @@ def main(model_args, data_args, training_args):
         load_from_cache_file=not data_args.overwrite_cache,
         desc="Grouping texts...",
     )
+    _path = os.path.join(training_args.output_dir, "grouped")
+    if not os.path.exists(_path):
+        os.makedirs(_path)
+    tokenized_datasets.save_to_disk(_path)
+    logger.info(f"Grouped datasets saved at {_path}")
 
     has_tensorboard = is_tensorboard_available()
     if has_tensorboard and jax.process_index() == 0:
