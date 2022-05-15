@@ -443,13 +443,14 @@ def main(model_args, data_args, training_args):
     dropout_rngs = jax.random.split(rng, jax.local_device_count())
 
     if model_args.model_name_or_path:
+        _from_pt = model_args.__dict__.get("from_pt", True)
         model = FlaxT5ForConditionalGeneration.from_pretrained(
             model_args.model_name_or_path,
             config=config,
             seed=training_args.seed,
             dtype=getattr(jnp, model_args.dtype),
             use_auth_token=model_args.use_auth_token,
-            from_pt=True,
+            from_pt=_from_pt,
         )
     else:
         config.vocab_size = len(tokenizer)
