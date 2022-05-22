@@ -389,7 +389,8 @@ def main(model_args, data_args, training_args):
         desc="Tokenizing...",
     )
     _path = os.path.join(model_args.cache_dir, "tokenized")
-    if not os.path.exists(_path):
+    if not os.path.exists(_path) and data_args.save_to_disk:
+        logger.info(f"Tokenizing datasets...")
         os.makedirs(_path)
         tokenized_datasets.save_to_disk(_path)
         logger.info(f"Tokenized datasets saved at {_path}")
@@ -419,7 +420,8 @@ def main(model_args, data_args, training_args):
         desc="Grouping texts...",
     )
     _path = os.path.join(model_args.cache_dir, "grouped")
-    if not os.path.exists(_path):
+    if not os.path.exists(_path) and data_args.save_to_disk:
+        logger.info(f"Grouping datasets")
         os.makedirs(_path)
         tokenized_datasets.save_to_disk(_path)
         logger.info(f"Grouped datasets saved at {_path}")
