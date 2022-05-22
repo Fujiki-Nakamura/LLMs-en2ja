@@ -300,9 +300,11 @@ def main(model_args, data_args, training_args):
 
     if data_args.dataset_name is not None or data_args.data_files is not None:
         if data_args.dataset_name is not None:
+            logger.info(f"Loading datasets with split {data_args.split}")
             datasets = load_dataset(
                 data_args.dataset_name,
                 data_args.dataset_config_name,
+                split=data_args.split,
                 cache_dir=model_args.cache_dir,
                 use_auth_token=model_args.use_auth_token,
             )
