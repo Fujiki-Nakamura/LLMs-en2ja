@@ -1,5 +1,6 @@
 inputs/*
 outputs/*
+*garbage*
 repos/
 notebooks/
 *runs/
