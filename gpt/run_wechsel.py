@@ -18,7 +18,7 @@ class args:
     data_files = ""
     source_model_checkpoint = "gpt2"
     target_model_checkpoint = "rinna/japanese-gpt2-small"
-    output_dir = "outputs/en2ja-gpt2"
+    output_dir = "../outputs/en2ja-gpt2"
     cache_dir = os.getenv("HF_DATASETS_CACHE")
     # WECHSEL
     source_lang_code = "en"
@@ -57,10 +57,12 @@ def main(args):
     else:
         with Timer(prefix=f"Saved target tokenizer at {args.output_dir}"):
             target_tokenizer = T.AutoTokenizer.from_pretrained(args.target_model_checkpoint, cache_dir=args.cache_dir)
+            '''
             for k, v in source_tokenizer.special_tokens_map.items():
                 prev_v = target_tokenizer.special_tokens_map[k]
                 target_tokenizer.add_special_tokens({k: v})
                 report(f"Update special tokens `{k}` from `{prev_v}` to `{v}`.")
+            '''
             target_tokenizer.save_pretrained(args.output_dir)
 
     with Timer(prefix="WECHSELed"):
