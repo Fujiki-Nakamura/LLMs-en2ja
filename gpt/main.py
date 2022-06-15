@@ -57,12 +57,7 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
 
     training_args.log_level = logging.DEBUG
     log_level = training_args.log_level
-    '''
-    print(training_args.log_level)
-    sys.exit(0)
-    '''
     # log_level = training_args.get_process_log_level()
-    # log_level = logging.DEBUG
     logger.setLevel(log_level)
     datasets.utils.logging.set_verbosity(log_level)
     transformers.utils.logging.set_verbosity(log_level)
