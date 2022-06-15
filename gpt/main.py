@@ -216,6 +216,9 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
             revision=model_args.model_revision,
             use_auth_token=True if model_args.use_auth_token else None,
         )
+        n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
+        logger.info(
+            f"Training from pretrained `{model_args.model_name_or_path}` - Total size={n_params/2**20:.2f}M params")
     else:
         model = AutoModelForCausalLM.from_config(config)
         n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
@@ -401,14 +404,15 @@ def _mp_fn(index):
 
 
 if __name__ == "__main__":
-    import argparse
     import importlib
     from utils import Timer
 
     with Timer(prefix="main"):
+        # import argparse
         # parser = argparse.ArgumentParser()
         # parser.add_argument("--cfg", type=str, default="cfg0")
         # args, _ = parser.parse_known_args()
         # config = importlib.import_module(args.cfg)
-        import cfg1_1 as config
+        config = importlib.import_module(os.getenv("CONF"))
+        # import cfg as config
         main(config.ModelArguments, config.DataArguments, TrainingArguments)
