@@ -1,3 +1,4 @@
+import argparse
 import logging
 import os
 import sys
@@ -12,18 +13,6 @@ from utils import Timer
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-
-
-class args:
-    data_files = ""
-    source_model_checkpoint = "gpt2"
-    target_model_checkpoint = "rinna/japanese-gpt2-small"
-    output_dir = "../outputs/en2ja-gpt2"
-    cache_dir = os.getenv("HF_DATASETS_CACHE")
-    # WECHSEL
-    source_lang_code = "en"
-    target_lang_code = "ja"
-    bilingual_dict = "japanese"
 
 
 def report(message):
@@ -85,4 +74,16 @@ def main(args):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--data_files", type=str, default="")
+    parser.add_argument("--source_model_checkpoint", type=str, default="gpt2")
+    parser.add_argument("--target_model_checkpoint", type=str, default="rinna/japanese-gpt2-small")
+    parser.add_argument("--output_dir", type=str, default="./outputs/")
+    parser.add_argument("--cache_dir", type=str, default=os.getenv("HF_DATASETS_CACHE"))
+    # WECHSEL
+    parser.add_argument("--source_lang_code", type=str, default="en")
+    parser.add_argument("--target_lang_code", type=str, default="ja")
+    parser.add_argument("--bilingual_dict", type=str, default="japanese")
+
+    args, _ = parser.parse_known_args()
     main(args)
