@@ -31,6 +31,7 @@ from transformers.utils.versions import require_version
 
 sys.path.append(os.path.join(os.getenv("PRJ_ROOT_DIR"), "scripts"))
 sys.path.append(os.path.join(os.getenv("WORK_DIR"), "configs"))
+from utils import FromIterableDataset  # noqa
 
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,19 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
     set_seed(training_args.seed)
 
     # datasets
-    if data_args.dataset_name is not None:
+    if data_args.streaming is True:
+        logger.info("data_args.streaming is True")
+        _train_ds = load_dataset(
+            data_args.dataset_name, data_args.dataset_config_name, cache_dir=model_args.cache_dir, split="train",
+            use_auth_token=model_args.use_auth_token, streaming=data_args.streaming,
+        )
+        _valid_ds = load_dataset(
+            data_args.dataset_name, data_args.dataset_config_name, cache_dir=model_args.cache_dir, split="validation",
+            use_auth_token=model_args.use_auth_token, streaming=data_args.streaming,
+        )
+        raw_datasets = D.IterableDatasetDict({"train": _train_ds, "validation": _valid_ds})
+        # below are the cases where dataset_name is None or streaming is False
+    elif data_args.dataset_name is not None:
         # Downloading and loading a dataset from the hub.
         raw_datasets = load_dataset(
             data_args.dataset_name,
@@ -229,13 +242,16 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
 
     # Preprocessing the datasets.
     # First we tokenize all the texts.
-    if training_args.do_train:
-        column_names = raw_datasets["train"].column_names
+    if data_args.streaming:
+        column_names = data_args.column_names
     else:
-        if data_args.dataset_name == 'oscar':
+        if training_args.do_train:
             column_names = raw_datasets["train"].column_names
         else:
-            column_names = raw_datasets["validation"].column_names
+            if data_args.dataset_name == 'oscar':
+                column_names = raw_datasets["train"].column_names
+            else:
+                column_names = raw_datasets["validation"].column_names
     text_column_name = "text" if "text" in column_names else column_names[0]
 
     # since this will be pickled to avoid _LazyModule error in Hasher force logger loading before tokenize_function
@@ -252,14 +268,21 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
         return output
 
     with training_args.main_process_first(desc="dataset map tokenization"):
-        tokenized_datasets = raw_datasets.map(
-            tokenize_function,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            remove_columns=column_names,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc="Running tokenizer on dataset",
-        )
+        if data_args.streaming:
+            tokenized_datasets = raw_datasets.map(
+                tokenize_function,
+                batched=True,
+                remove_columns=column_names,
+            )
+        else:
+            tokenized_datasets = raw_datasets.map(
+                tokenize_function,
+                batched=True,
+                num_proc=data_args.preprocessing_num_workers,
+                remove_columns=column_names,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc="Running tokenizer on dataset",
+            )
 
     if data_args.block_size is None:
         block_size = tokenizer.model_max_length
@@ -296,13 +319,16 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
         return result
 
     with training_args.main_process_first(desc="grouping texts together"):
-        lm_datasets = tokenized_datasets.map(
-            group_texts,
-            batched=True,
-            num_proc=data_args.preprocessing_num_workers,
-            load_from_cache_file=not data_args.overwrite_cache,
-            desc=f"Grouping texts in chunks of {block_size}",
-        )
+        if data_args.streaming:
+            lm_datasets = tokenized_datasets.map(group_texts, batched=True,)
+        else:
+            lm_datasets = tokenized_datasets.map(
+                group_texts,
+                batched=True,
+                num_proc=data_args.preprocessing_num_workers,
+                load_from_cache_file=not data_args.overwrite_cache,
+                desc=f"Grouping texts in chunks of {block_size}",
+            )
 
     if training_args.do_train:
         if "train" not in tokenized_datasets:
@@ -315,6 +341,10 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
         if "validation" not in tokenized_datasets:
             raise ValueError("--do_eval requires a validation dataset")
         eval_dataset = lm_datasets["validation"]
+        if data_args.streaming:
+            logger.info("Converting iterable eval_dataset to non-iterable.")
+            eval_dataset = FromIterableDataset(eval_dataset)
+
         if data_args.max_eval_samples is not None:
             eval_dataset = eval_dataset.select(range(data_args.max_eval_samples))
 
