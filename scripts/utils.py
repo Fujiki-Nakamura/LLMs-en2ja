@@ -1,4 +1,16 @@
 from time import time
+import datasets as D
+
+
+class FromIterableDataset:
+    def __init__(self, iterable_dataset: D.IterableDataset):
+        self.dataset = list(iterable_dataset)
+
+    def __getitem__(self, idx):
+        return self.dataset[idx]
+
+    def __len__(self):
+        return len(self.dataset)
 
 
 class Timer:
