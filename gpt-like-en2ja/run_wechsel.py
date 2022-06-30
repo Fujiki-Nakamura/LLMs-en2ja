@@ -9,7 +9,9 @@ import datasets as D
 import transformers as T
 
 from wechsel import WECHSEL, load_embeddings
-from utils import Timer
+
+sys.path.append(os.path.join(os.getenv("PRJ_ROOT_DIR"), "scripts"))
+from utils import Timer  # noqa
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
