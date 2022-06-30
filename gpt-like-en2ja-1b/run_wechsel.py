@@ -32,7 +32,7 @@ def main(args):
     # source
     source_tokenizer = T.AutoTokenizer.from_pretrained(args.source_model_checkpoint, cache_dir=args.cache_dir)
     source_model = T.AutoModelForCausalLM.from_pretrained(args.source_model_checkpoint, cache_dir=args.cache_dir)
-    report(source_model.num_parameters())
+    report(f"Source model's num_parameters: {source_model.num_parameters()}")
 
     # target
     if len(args.data_files) > 0:
@@ -48,6 +48,7 @@ def main(args):
     else:
         with Timer(prefix=f"Saved target tokenizer at {args.output_dir}"):
             target_tokenizer = T.AutoTokenizer.from_pretrained(args.target_model_checkpoint, cache_dir=args.cache_dir)
+            report(f"Target tokenizer's vocab_size: {target_tokenizer.vocab_size}")
             '''
             for k, v in source_tokenizer.special_tokens_map.items():
                 prev_v = target_tokenizer.special_tokens_map[k]
@@ -72,6 +73,28 @@ def main(args):
 
     with Timer(prefix=f"Saved pretrained models at {args.output_dir}"):
         source_model.get_input_embeddings().weight.data = torch.from_numpy(target_embeddings)
+
+        repo_name = os.path.basename(args.output_dir)
+        _prev = source_model.config._name_or_path
+        _new = f"{args.username}/{repo_name}"
+        source_model.config._name_or_path = _new
+        report(f"Changed config value from `{_prev} to {_new}`")
+
+        _prev = source_model.config.bos_token_id
+        _new = target_tokenizer.bos_token_id
+        source_model.config.bos_token_id = _new
+        report(f"Changed config value from `{_prev} to {_new}`")
+
+        _prev = source_model.config.eos_token_id
+        _new = target_tokenizer.eos_token_id
+        source_model.config.eos_token_id = _new
+        report(f"Changed config value from `{_prev} to {_new}`")
+
+        _prev = source_model.config.vocab_size
+        _new = target_tokenizer.vocab_size + 1
+        source_model.config.eos_token_id = _new
+        report(f"Changed config value from `{_prev} to {_new}`")
+
         source_model.save_pretrained(args.output_dir)
 
 
@@ -82,6 +105,7 @@ if __name__ == "__main__":
     parser.add_argument("--target_model_checkpoint", type=str, default="rinna/japanese-gpt2-small")
     parser.add_argument("--output_dir", type=str, default="./outputs/")
     parser.add_argument("--cache_dir", type=str, default=os.getenv("HF_DATASETS_CACHE"))
+    parser.add_argument("--username", type=str, default="username")
     # WECHSEL
     parser.add_argument("--source_lang_code", type=str, default="en")
     parser.add_argument("--target_lang_code", type=str, default="ja")

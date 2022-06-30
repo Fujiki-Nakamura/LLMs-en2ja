@@ -243,7 +243,8 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
     # Preprocessing the datasets.
     # First we tokenize all the texts.
     if data_args.streaming:
-        column_names = data_args.column_names
+        column_names = ["text", "n_sentences"]
+        # column_names = data_args.column_names
     else:
         if training_args.do_train:
             column_names = raw_datasets["train"].column_names
