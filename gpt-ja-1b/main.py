@@ -3,11 +3,10 @@
 import logging
 import math
 import os
-# from pathlib import Path
 import sys
 from itertools import chain
 
-import datasets
+import datasets as D
 from datasets import load_dataset, load_metric
 
 from huggingface_hub import HfApi, HfFolder  # , Repository
@@ -28,8 +27,10 @@ from transformers import (
 from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version
-# from transformers.utils import get_full_repo_name
 from transformers.utils.versions import require_version
+
+sys.path.append(os.path.join(os.getenv("PRJ_ROOT_DIR"), "scripts"))
+sys.path.append(os.path.join(os.getenv("WORK_DIR"), "configs"))
 
 
 logger = logging.getLogger(__name__)
@@ -59,7 +60,7 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
     log_level = training_args.log_level
     # log_level = training_args.get_process_log_level()
     logger.setLevel(log_level)
-    datasets.utils.logging.set_verbosity(log_level)
+    D.utils.logging.set_verbosity(log_level)
     transformers.utils.logging.set_verbosity(log_level)
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
@@ -172,9 +173,6 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
                 use_auth_token=True if model_args.use_auth_token else None,
                 **dataset_args,
             )
-
-    # shuffle the datasets for sure
-    # raw_datasets['train'] = raw_datasets['train'].shuffle(seed=training_args.seed)
 
     # configs
     config_kwargs = {
@@ -411,11 +409,5 @@ if __name__ == "__main__":
     from utils import Timer
 
     with Timer(prefix="main"):
-        # import argparse
-        # parser = argparse.ArgumentParser()
-        # parser.add_argument("--cfg", type=str, default="cfg0")
-        # args, _ = parser.parse_known_args()
-        # config = importlib.import_module(args.cfg)
         config = importlib.import_module(os.getenv("CONF"))
-        # import cfg as config
         main(config.ModelArguments, config.DataArguments, TrainingArguments)
