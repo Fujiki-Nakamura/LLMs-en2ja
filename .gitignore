@@ -1,5 +1,10 @@
 inputs/*
 outputs/*
+notebooks/*
+garbage/*
+*configs*
+runs/
+*sh.o*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
