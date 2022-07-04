@@ -339,7 +339,7 @@ def main(model_args, data_args, training_args):
             model_args.tokenizer_name,
             cache_dir=model_args.cache_dir,
             use_fast=model_args.use_fast_tokenizer,
-            use_auto_token=model_args.use_auth_token,
+            use_auth_token=model_args.use_auth_token,
         )
     elif model_args.model_name_or_path:
         tokenizer = AutoTokenizer.from_pretrained(
