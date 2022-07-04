@@ -29,7 +29,12 @@ def main(args):
 
     # source
     source_tokenizer = T.AutoTokenizer.from_pretrained(args.source_model_checkpoint, cache_dir=args.cache_dir)
-    source_model = T.AutoModelForCausalLM.from_pretrained(args.source_model_checkpoint, cache_dir=args.cache_dir)
+    if args.model_type == "gpt":
+        source_model = T.AutoModelForCausalLM.from_pretrained(args.source_model_checkpoint, cache_dir=args.cache_dir)
+    elif args.model_type == "t5":
+        source_model = T.AutoModelForSeq2SeqLM.from_pretrained(args.source_model_checkpoint, cache_dir=args.cache_dir)
+    else:
+        raise NotImplementedError(f"model_type `{args.model_type}` is not implemented.")
     report(source_model.num_parameters())
 
     # target
@@ -76,6 +81,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_files", type=str, default="")
+    parser.add_argument("--model_type", type=str, default="t5")
     parser.add_argument("--source_model_checkpoint", type=str, default="gpt2")
     parser.add_argument("--target_model_checkpoint", type=str, default="rinna/japanese-gpt2-small")
     parser.add_argument("--output_dir", type=str, default="./outputs/")
