@@ -1,9 +1,10 @@
 inputs/*
 outputs/*
-notebooks/*
-garbage/*
+*garbage*
+repos/
+notebooks/
+*runs/
 *configs*
-runs/
 *sh.o*
 
 # Byte-compiled / optimized / DLL files
