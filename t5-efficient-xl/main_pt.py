@@ -530,10 +530,10 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
         )
     else:
         config.vocab_size = len(tokenizer)
-        model = T5ForConditionalGeneration(
-            config,
-            # seed=training_args.seed,
-        )
+        model = T5ForConditionalGeneration(config)
+        n_params = sum(dict((p.data_ptr(), p.numel()) for p in model.parameters()).values())
+        logger.info(f"Training new model from scratch - Total size={n_params/2**20:.2f}M params")
+
     model.resize_token_embeddings(len(tokenizer))
 
     # print(f"max_seq_length = {max_seq_length} - targets_length = {targets_length}"); sys.exit(0)
