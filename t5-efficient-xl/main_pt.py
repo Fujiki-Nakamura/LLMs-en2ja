@@ -524,9 +524,9 @@ def main(ModelArguments, DataTrainingArguments, TrainingArguments):
         model = T5ForConditionalGeneration.from_pretrained(
             model_args.model_name_or_path,
             config=config,
-            # seed=training_args.seed,
             use_auth_token=model_args.use_auth_token,
-            # from_pt=model_args.from_pt,
+            from_pt=model_args.from_pt,
+            # seed=training_args.seed,
         )
     else:
         config.vocab_size = len(tokenizer)
